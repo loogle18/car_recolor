@@ -1,0 +1,4 @@
+pydot>=1.4.1
+numpy>=1.18.0
+tensorflow>=2.0.0
+opencv-python>=4.0.0
