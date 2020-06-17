@@ -5,5 +5,7 @@ stuff/
 history/
 images/
 dataset/
-checkpoints/
+testing/
+checkpoints*/
+tflite_models/
 *.png

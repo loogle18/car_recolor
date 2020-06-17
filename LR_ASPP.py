@@ -22,6 +22,7 @@ class LiteRASSP:
             weights: String, weights for mobilenetv3.
             backbone: String, name of backbone (must be small or large).
         """
+        self.size = input_shape[0]
         self.shape = input_shape
         self.n_class = n_class
         self.alpha = alpha
@@ -79,12 +80,12 @@ class LiteRASSP:
 
         # out
         o = tf.image.resize(x,
-                            size=(1024, 1024),
+                            size=(self.size, self.size),
                             method=ResizeMethod.BILINEAR,
                             preserve_aspect_ratio=False,
                             antialias=False,
                             name=None)
-        o = (Reshape((1024*1024, -1)))(o)
+        o = (Reshape((self.size * self.size, -1)))(o)
         o = Activation("softmax")(o)
 
         model = Model(inputs=inputs, outputs=o)

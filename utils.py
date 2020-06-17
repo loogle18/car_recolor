@@ -8,6 +8,7 @@ from tqdm import tqdm
 from augmentation import augment_seg
 
 
+IMAGE_NORM = "sub_mean"
 IMAGE_ORDERING = "channels_last"
 
 
@@ -53,8 +54,33 @@ def get_pairs_from_paths(images_path, segs_path, ignore_non_matching=False):
     return return_value
 
 
-def get_image_array(image_input, width, height, imgNorm="sub_mean",
-                  ordering='channels_first'):
+def crop_and_resize(img, w, h):
+    im_h, im_w, channels = img.shape
+    res_aspect_ratio = w/h
+    input_aspect_ratio = im_w/im_h
+
+    if input_aspect_ratio > res_aspect_ratio:
+        im_w_r = int(input_aspect_ratio*h)
+        im_h_r = h
+        img = cv2.resize(img, (im_w_r , im_h_r))
+        x1 = int((im_w_r - w)/2)
+        x2 = x1 + w
+        img = img[:, x1:x2, :]
+    if input_aspect_ratio < res_aspect_ratio:
+        im_w_r = w
+        im_h_r = int(w/input_aspect_ratio)
+        img = cv2.resize(img, (im_w_r , im_h_r))
+        y1 = int((im_h_r - h)/2)
+        y2 = y1 + h
+        img = img[y1:y2, :, :]
+    if input_aspect_ratio == res_aspect_ratio:
+        img = cv2.resize(img, (w, h))
+
+    return img
+
+
+def get_image_array(image_input, width, height, img_norm="sub_mean",
+                  ordering="channels_first"):
     """ Load image array from input """
 
     if type(image_input) is np.ndarray:
@@ -67,22 +93,29 @@ def get_image_array(image_input, width, height, imgNorm="sub_mean",
     else:
         raise DataLoaderError("get_image_array: Can't process input type {0}".format(str(type(image_input))))
 
-    if imgNorm == "sub_and_divide":
+    if img_norm == "sub_and_divide":
         img = np.float32(cv2.resize(img, (width, height))) / 127.5 - 1
-    elif imgNorm == "sub_mean":
+    elif img_norm == "sub_mean":
         img = cv2.resize(img, (width, height))
         img = img.astype(np.float32)
         img[:, :, 0] -= 103.939
         img[:, :, 1] -= 116.779
         img[:, :, 2] -= 123.68
         img = img[:, :, ::-1]
-    elif imgNorm == "divide":
+    elif img_norm == "divide":
         img = cv2.resize(img, (width, height))
         img = img.astype(np.float32)
         img = img/255.0
-
-    if ordering == 'channels_first':
+    elif img_norm == "sub_mean_new_resize":
+        img = crop_and_resize(img, width, height)
+        img = img.astype(np.float32)
+        img[:, :, 0] -= 103.939
+        img[:, :, 1] -= 116.779
+        img[:, :, 2] -= 123.68
+        img = img[:, :, ::-1]
+    if ordering == "channels_first":
         img = np.rollaxis(img, 2, 0)
+
     return img
 
 
@@ -167,8 +200,7 @@ def image_segmentation_generator(images_path, segs_path, batch_size,
             if do_augment:
                 im, seg[:, :, 0] = augment_seg(im, seg[:, :, 0])
 
-            X.append(get_image_array(im, input_width,
-                                   input_height, ordering=IMAGE_ORDERING))
+            X.append(get_image_array(im, input_width, input_height, img_norm=IMAGE_NORM, ordering=IMAGE_ORDERING))
             Y.append(get_segmentation_array(
                 seg, n_classes, output_width, output_height))
 
