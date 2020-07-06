@@ -1,7 +1,7 @@
 """Lite R-ASPP Semantic Segmentation based on MobileNetV3.
 """
 
-from mobilenet_v3 import MobileNetV3
+from mobilenet_v3_small import MobileNetV3_Small
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Conv2D, AveragePooling2D, BatchNormalization, Activation, Multiply, Add, Reshape
 from tensorflow.keras.utils import plot_model
@@ -31,9 +31,9 @@ class LiteRASSP:
     def _extract_backbone(self, plot=False):
         """extract feature map from backbone.
         """
-        model = MobileNetV3(self.shape, self.n_class, alpha=self.alpha, include_top=False).build(plot=plot)
-        layer_name8 = "batch_normalization_13"
-        layer_name16 = "add_5"
+        model = MobileNetV3_Small(self.shape, self.n_class, alpha=self.alpha, include_top=False).build(plot=plot)
+        layer_name8 = "batch_normalization_7"
+        layer_name16 = "add_2"
         if self.weights is not None:
             model.load_weights(self.weights, by_name=True)
 
@@ -62,11 +62,10 @@ class LiteRASSP:
         # branch2
         s = x1.shape
 
-        x2 = AveragePooling2D(pool_size=(49, 49), strides=(20, 20))(out_feature16)
+        x2 = AveragePooling2D(pool_size=(25, 25), strides=(8, 8))(out_feature16)
         x2 = Conv2D(128, (1, 1))(x2)
         x2 = Activation("sigmoid")(x2)
         x2 = BilinearUpSampling2D(target_size=(int(s[1]), int(s[2])))(x2)
-        # x2 = tf.keras.layers.UpSampling2D(size=(int(s[1]), int(s[2])))(x2)
 
         # branch3
         x3 = Conv2D(self.n_class, (1, 1))(out_feature8)
@@ -74,7 +73,6 @@ class LiteRASSP:
         # merge1
         x = Multiply()([x1, x2])
         x = BilinearUpSampling2D(size=(2, 2))(x)
-        # x = tf.keras.layers.UpSampling2D(size=(int(2), int(2)))(x)
         x = Conv2D(self.n_class, (1, 1))(x)
 
         # merge2
@@ -89,16 +87,6 @@ class LiteRASSP:
                             name=None)
         o = (Reshape((self.size * self.size, -1)))(o)
         o = Activation("softmax")(o)
-        # print("----------------------------")
-        # print(o)
-        # print("----------------------------")
-        # o = (Reshape((self.size * self.n_class, -1)))(o)
-        # print("----------------------------")
-        # print(o)
-        # print("----------------------------")
-
-        # o = o[self.size:]
-        # o = (Reshape((self.size * self.n_class, -1)))(o)
 
         model = Model(inputs=inputs, outputs=o)
 

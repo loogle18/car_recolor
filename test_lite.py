@@ -5,11 +5,18 @@ import numpy as np
 import tensorflow as tf
 
 
+N_CHANNELS = 1
+INPUT_SIZE = 1024
+
+
 def predict(inp, out, input_details, output_details):
-    test_img = cv2.imread(inp)
+    test_img = cv2.imread(inp, 1)
     x = helpers.get_image_array(inp, INPUT_SIZE, INPUT_SIZE)
+    # print(x)
+    xx = np.array([x]).reshape(1, INPUT_SIZE, INPUT_SIZE, N_CHANNELS)
+    print(xx.shape)
     start_time = time.time()
-    interpreter.set_tensor(input_details[0]['index'], np.array([x]))
+    interpreter.set_tensor(input_details[0]['index'], xx)
     interpreter.invoke()
     result = interpreter.get_tensor(output_details[0]['index'])
     # print(output_data)
@@ -23,15 +30,9 @@ def predict(inp, out, input_details, output_details):
 
 
 # Load the TFLite model and allocate tensors.
-interpreter = tf.lite.Interpreter(model_path=f"custom_model_{INPUT_SIZE}_new.tflite")
+interpreter = tf.lite.Interpreter(model_path=f"tflite_models/custom_model_{INPUT_SIZE}_gs_pd_1298_158.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
+print(input_details)
 output_details = interpreter.get_output_details()
-
-
-predict("testing/test_img.png", "testing/result_lite.png", input_details, output_details)
-predict("testing/test_img_2.png", "testing/result_2_lite.png", input_details, output_details)
-predict("testing/test_img_3.png", "testing/result_3_lite.png", input_details, output_details)
-predict("testing/test_img_4.png", "testing/result_4_lite.png", input_details, output_details)
-predict("testing/test_img_5.png", "testing/result_5_lite.png", input_details, output_details)
-predict("testing/test_img_6.png", "testing/result_6_lite.png", input_details, output_details)
+print(output_details)

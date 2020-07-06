@@ -5,7 +5,7 @@ import random
 import itertools
 import numpy as np
 from tqdm import tqdm
-from augmentation import augment_seg
+from stuff.augmentation import augment_seg
 
 
 IMAGE_NORM = "sub_mean"
@@ -54,26 +54,42 @@ def get_pairs_from_paths(images_path, segs_path, ignore_non_matching=False):
     return return_value
 
 
-def crop_and_resize(img, w, h):
-    im_h, im_w, channels = img.shape
-    res_aspect_ratio = w/h
-    input_aspect_ratio = im_w/im_h
+def resize_padding(img):
+    resize_ratio = 1.0
+    old_size = img.shape[:2]
+    desired_size = max(old_size)
+    new_size = tuple([int(x * resize_ratio) for x in old_size])
+    img = cv2.resize(img, (new_size[1], new_size[0]))
+    delta_w = desired_size - new_size[1]
+    delta_h = desired_size - new_size[0]
+    top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+    left, right = delta_w // 2, delta_w - (delta_w // 2)
+    img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[0, 0, 0])
 
-    if input_aspect_ratio > res_aspect_ratio:
-        im_w_r = int(input_aspect_ratio*h)
-        im_h_r = h
-        img = cv2.resize(img, (im_w_r , im_h_r))
-        x1 = int((im_w_r - w)/2)
+    return img
+
+
+def resize_crop(img):
+    resize_ratio = 1.0
+    img_h, img_w, = img.shape[:2]
+    h = w = max(img_h, img_w)
+    input_ratio = img_w / img_h
+
+    if input_ratio > resize_ratio:
+        img_wr = int(input_ratio * h)
+        img_hr = h
+        img = cv2.resize(img, (img_wr, img_hr))
+        x1 = int((img_wr - w) / 2)
         x2 = x1 + w
         img = img[:, x1:x2, :]
-    if input_aspect_ratio < res_aspect_ratio:
-        im_w_r = w
-        im_h_r = int(w/input_aspect_ratio)
-        img = cv2.resize(img, (im_w_r , im_h_r))
-        y1 = int((im_h_r - h)/2)
+    if input_ratio < resize_ratio:
+        img_wr = w
+        img_hr = int(w / input_ratio)
+        img = cv2.resize(img, (img_wr , img_hr))
+        y1 = int((img_hr - h) / 2)
         y2 = y1 + h
         img = img[y1:y2, :, :]
-    if input_aspect_ratio == res_aspect_ratio:
+    if input_ratio == resize_ratio:
         img = cv2.resize(img, (w, h))
 
     return img
@@ -98,6 +114,24 @@ def get_image_array(image_input, width, height, img_norm="sub_mean",
     elif img_norm == "sub_mean":
         img = cv2.resize(img, (width, height))
         img = img.astype(np.float32)
+        # img[:, :, 0] = (img[:, :, 0] - 87.195) / 70.900
+        # img[:, :, 1] = (img[:, :, 1] - 86.408) / 68.489
+        # img[:, :, 2] = (img[:, :, 2] - 89.585) / 70.921
+
+        # img[:, :, 0] = (img[:, :, 0] * (0.27804186 ** 2) )
+        # img[:, :, 1] = (img[:, :, 1] * (0.26858492 ** 2) )
+        # img[:, :, 2] = (img[:, :, 2] * (0.27812227 ** 2) )
+
+        cc = 0.299 * img[:, :, 2] + 0.587 * img[:, :, 1] + 0.114 * img[:, :, 0]
+        img[:, :, 0] = cc
+        img = img[:, :, 0]
+        # img[:, :, 1] = cc
+        # img[:, :, 2] = cc
+        # img = img[:, :, ::-1]
+    elif img_norm == "sub_mean_old":
+        img = resize_padding(img)
+        img = cv2.resize(img, (width, height))
+        img = img.astype(np.float32)
         img[:, :, 0] -= 103.939
         img[:, :, 1] -= 116.779
         img[:, :, 2] -= 123.68
@@ -106,6 +140,7 @@ def get_image_array(image_input, width, height, img_norm="sub_mean",
         img = cv2.resize(img, (width, height))
         img = img.astype(np.float32)
         img = img/255.0
+        # img = img[:, :, ::-1]
     elif img_norm == "sub_mean_new_resize":
         img = crop_and_resize(img, width, height)
         img = img.astype(np.float32)
@@ -113,6 +148,19 @@ def get_image_array(image_input, width, height, img_norm="sub_mean",
         img[:, :, 1] -= 116.779
         img[:, :, 2] -= 123.68
         img = img[:, :, ::-1]
+    elif img_norm == "new_new":
+        # img = cv2.resize(img, (width, height))
+        # img = img.astype(np.float32)
+        # img[:, :, 0] = (img[:, :, 0] - 121.29154027) / 68.12240857
+        # img[:, :, 1] = (img[:, :, 1] - 117.34863752) / 67.22203485
+        # img[:, :, 2] = (img[:, :, 2] - 111.89637408) / 69.61162893
+        # img = img[:, :, ::-1]
+        img = resize_padding(img)
+        img = cv2.resize(img, (width, height))
+        img = img.astype(np.float32)
+        cc = 0.299 * img[:, :, 2] + 0.587 * img[:, :, 1] + 0.114 * img[:, :, 0]
+        img[:, :, 0] = cc
+        img = img[:, :, 0]
     if ordering == "channels_first":
         img = np.rollaxis(img, 2, 0)
 
